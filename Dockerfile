@@ -115,7 +115,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* /tmp/* \
-    && test "$(python -c 'import importlib.metadata; print(importlib.metadata.version(\"octop\"))')" = "${OCTOP_SOURCE_VERSION}" \
+    && test "$(python -c 'import importlib.metadata; print(importlib.metadata.version("octop"))')" = "${OCTOP_SOURCE_VERSION}" \
     && chmod +x /usr/local/bin/octop-upstream-entrypoint /usr/local/bin/octop-hfs-entrypoint \
     && if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 user; fi \
     && mkdir -p /data/.octop /home/user /opt/ms-playwright \
