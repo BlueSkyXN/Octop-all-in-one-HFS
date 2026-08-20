@@ -30,8 +30,8 @@ The Docker build fetches and verifies one immutable upstream revision:
 
 ```text
 repository: https://github.com/TencentCloud/Octop.git
-commit:     8d0503079f5dd1e66b2b0320e0ed405c46d1cd0b
-version:    0.9.19
+commit:     08ac49c09f6dd91c09fe3c540269441b3a67f629
+version:    0.9.24
 ```
 
 The full upstream source is not copied into this wrapper repository. The build

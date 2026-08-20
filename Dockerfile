@@ -3,8 +3,8 @@
 ARG NODE_IMAGE=node:20-slim
 ARG PYTHON_IMAGE=python:3.12-slim
 ARG OCTOP_SOURCE_REPO=https://github.com/TencentCloud/Octop.git
-ARG OCTOP_SOURCE_REF=8d0503079f5dd1e66b2b0320e0ed405c46d1cd0b
-ARG OCTOP_SOURCE_VERSION=0.9.19
+ARG OCTOP_SOURCE_REF=08ac49c09f6dd91c09fe3c540269441b3a67f629
+ARG OCTOP_SOURCE_VERSION=0.9.24
 
 FROM ${NODE_IMAGE} AS source
 
@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN mkdir -p ../src/octop/dashboard \
     && NODE_ENV=production \
        NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" \
-       npx vite build
+       npm run build:docker
 
 FROM ${PYTHON_IMAGE} AS runtime
 
