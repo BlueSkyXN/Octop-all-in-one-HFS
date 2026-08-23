@@ -3,8 +3,8 @@
 ARG NODE_IMAGE=node:20-slim
 ARG PYTHON_IMAGE=python:3.12-slim
 ARG OCTOP_SOURCE_REPO=https://github.com/TencentCloud/Octop.git
-ARG OCTOP_SOURCE_REF=08ac49c09f6dd91c09fe3c540269441b3a67f629
-ARG OCTOP_SOURCE_VERSION=0.9.24
+ARG OCTOP_SOURCE_REF=bfe017adc183cbce7fbd6ca57b050d925a015ee0
+ARG OCTOP_SOURCE_VERSION=0.9.25
 
 FROM ${NODE_IMAGE} AS source
 
@@ -63,6 +63,7 @@ LABEL org.opencontainers.image.title="Octop All-in-One HFS" \
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HOME=/data \
+    OCTOP_HOME=/data/.octop \
     OCTOP_BIND_HOST=0.0.0.0 \
     OCTOP_PORT=7860 \
     OCTOP_LOG_LEVEL=info \
@@ -72,7 +73,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+    DISPLAY=:99 \
+    OCTOP_DESKTOP_DISPLAY=:99 \
+    OCTOP_DESKTOP_GEOMETRY=1920x1080
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -95,7 +99,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
-    && uv sync --frozen --no-install-project --no-dev --extra browser
+    && uv sync --frozen --no-install-project --no-dev --extra browser --extra desktop
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
@@ -110,7 +114,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
-    && uv sync --frozen --no-dev --extra browser \
+    && uv sync --frozen --no-dev --extra browser --extra desktop \
+    && python -c 'import mss, pynput, PIL' \
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
@@ -120,6 +125,36 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 user; fi \
     && mkdir -p /data/.octop /home/user /opt/ms-playwright \
     && chown -R 1000:1000 /data /home/user /opt/ms-playwright
+
+# Hugging Face runs uid 1000 without sudo. Bake the upstream virtual desktop
+# into the image and chown it so the entrypoint can start Xvnc without root.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    set -eux; \
+    mkdir -p /tmp/.X11-unix /tmp/runtime-octop-desktop /data/.octop/desktop; \
+    chmod 1777 /tmp/.X11-unix; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends procps; \
+    if ! OCTOP_HOME=/data/.octop HOME=/data \
+      /bin/bash /app/src/octop/infra/desktop/scripts/linux/v1.0/install.sh \
+        --geometry "${OCTOP_DESKTOP_GEOMETRY:-1920x1080}" \
+        --python /app/.venv/bin/python; then \
+      echo "install.sh exited non-zero; keep baked files if the desktop stack is complete"; \
+    fi; \
+    pkill -f 'X(vnc|tigervnc).*:99' || true; \
+    pkill -f 'openbox --config-file /opt/octop-desktop/openbox.xml' || true; \
+    pkill -x xfce4-panel || true; \
+    pkill -f xfdesktop || true; \
+    rm -f /tmp/.X99-lock; \
+    rm -rf /tmp/.X11-unix/X99 /data/.octop/desktop/pids; \
+    test -x /opt/octop-desktop/start-openbox.sh; \
+    test -x /opt/octop-desktop/start-session.sh; \
+    test -d /etc/octop-desktop; \
+    test -f /etc/octop-desktop/rfbauth; \
+    command -v Xvnc >/dev/null || command -v Xtigervnc >/dev/null; \
+    chown -R 1000:1000 /opt/octop-desktop /etc/octop-desktop /root /data /tmp/runtime-octop-desktop; \
+    chmod 755 /root; \
+    rm -rf /var/lib/apt/lists/* /tmp/*
 
 USER 1000
 

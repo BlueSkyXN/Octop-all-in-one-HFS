@@ -30,8 +30,8 @@ The Docker build fetches and verifies one immutable upstream revision:
 
 ```text
 repository: https://github.com/TencentCloud/Octop.git
-commit:     08ac49c09f6dd91c09fe3c540269441b3a67f629
-version:    0.9.24
+commit:     bfe017adc183cbce7fbd6ca57b050d925a015ee0
+version:    0.9.25
 ```
 
 The full upstream source is not copied into this wrapper repository. The build
@@ -60,6 +60,13 @@ The wrapper requires `OCTOP_DEFAULT_PASSWORD`; it does not allow the upstream
 well-known fallback password. On first start, the upstream idempotent container
 entrypoint initializes `/data/.octop` and then starts `octop run` on port 7860.
 Subsequent starts reuse the existing database.
+
+The image also preinstalls the upstream Linux virtual desktop (TigerVNC on
+`:99`, Openbox/XFCE) and starts it with the container. Hugging Face runs uid
+`1000` without sudo, so the in-app "Install virtual desktop" button cannot
+install packages or write `/opt` and `/etc`. After a rebuild, open Remote
+Desktop directly; do not retry that installer. UI geometry change and
+uninstall still need root/sudo and are not supported in this preview.
 
 The login values are maintained in the ignored local `.env` ledger and
 synchronized as the Space variable `OCTOP_ADMIN_USERNAME` and secret
