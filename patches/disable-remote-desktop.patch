@@ -1,0 +1,85 @@
+diff --git a/dashboard/src/layouts/Sidebar.tsx b/dashboard/src/layouts/Sidebar.tsx
+index d573cf3..d5d87b3 100644
+--- a/dashboard/src/layouts/Sidebar.tsx
++++ b/dashboard/src/layouts/Sidebar.tsx
+@@ -7,7 +7,6 @@ import AvatarDropdown from "../components/AvatarDropdown";
+ import AppVersionBadge from "../components/AppVersionBadge";
+ import CurrentVersionBadge from "../components/CurrentVersionBadge";
+ import {
+-  Monitor,
+   MessageSquareText,
+   Timer,
+   ArrowRightLeft,
+@@ -212,14 +211,6 @@ function buildNavSections(user: OctopUser | null): NavSection[] {
+       labelKey: "nav.workbench",
+     });
+   }
+-  if (navAllowed(user, "remote-desktop")) {
+-    controlItems.push({
+-      key: "remote-desktop",
+-      path: "/remote-desktop",
+-      icon: <Monitor size={iconSize} strokeWidth={iconStroke} />,
+-      labelKey: "nav.remoteDesktop",
+-    });
+-  }
+   // ACP: no module key this round — admin role only.
+   if (navAllowed(user, "acp")) {
+     controlItems.push({
+diff --git a/dashboard/src/routes/index.tsx b/dashboard/src/routes/index.tsx
+index 32273a2..422ecf8 100644
+--- a/dashboard/src/routes/index.tsx
++++ b/dashboard/src/routes/index.tsx
+@@ -13,9 +13,6 @@ const PersonalizationPage = lazy(
+ );
+ const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
+ 
+-// Lazy-loaded pages — Control
+-const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
+-
+ // Lazy-loaded pages — Settings
+ const ModelsPage = lazy(() => import("../pages/Settings/Models"));
+ 
+@@ -69,7 +66,6 @@ export const pathToKey: Record<string, string> = {
+   "/workbench/browser": "workbench",
+   "/terminal": "workbench",
+   "/remote-browser": "workbench",
+-  "/remote-desktop": "remote-desktop",
+   "/subagents": "personalization",
+   "/mbti": "personalization",
+   "/memory": "personalization",
+@@ -91,7 +87,6 @@ export const FULLSCREEN_PATHS = new Set([
+   "/workbench/terminal",
+   "/workbench/browser",
+   "/chat",
+-  "/remote-desktop",
+ ]);
+ 
+ /**
+@@ -157,7 +152,6 @@ export const routeConfigs: RouteConfig[] = [
+     path: "/remote-browser",
+     element: <RedirectPreserveSearch to="/workbench/browser" />,
+   },
+-  { path: "/remote-desktop", element: <RemoteDesktopPage /> },
+   {
+     path: "/subagents",
+     element: <RedirectPreserveSearch to="/personalization/subagents" />,
+diff --git a/src/octop/api/app.py b/src/octop/api/app.py
+index af0a006..970cd3f 100644
+--- a/src/octop/api/app.py
++++ b/src/octop/api/app.py
+@@ -134,7 +134,6 @@ def create_app(server: Any) -> FastAPI:
+         chat,
+         connectors,
+         cron,
+-        desktop,
+         envs,
+         experts,
+         health,
+@@ -229,7 +228,6 @@ def create_app(server: Any) -> FastAPI:
+             _RouterMount(uploads.router, "/api", ["chat"]),
+             _RouterMount(update.router, "/api", ["update"]),
+             _RouterMount(browser.router, "/api", ["browser"]),
+-            _RouterMount(desktop.router, "/api", ["desktop"]),
+             _RouterMount(ollama_models.router, "/api", ["ollama"]),
+             _RouterMount(onnx_models.router, "/api", ["onnx"]),
+             _RouterMount(plugins.router, "/api", ["plugins"]),

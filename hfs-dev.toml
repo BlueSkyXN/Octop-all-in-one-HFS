@@ -1,0 +1,25 @@
+standard = "3.0"
+project = "octop-all-in-one-hfs"
+space = "BlueSkyXN/Octop-all-in-one-HFS"
+
+project_class = "preview"
+target_role = "primary"
+sovereignty = "port"
+lane = "source"
+version_source = "commit"
+
+space_visibility = "protected"
+bucket_visibility = "private"
+
+env_file = ".env"
+local_only = ["HF_TOKEN", "GH_TOKEN", "OPS_TOKEN"]
+secrets = ["ADMIN_PASSWORD"]
+optional_secrets = []
+variables = ["ADMIN_USERNAME"]
+
+[compat]
+expires_after = "3.1"
+
+[compat.env_map]
+ADMIN_USERNAME = "OCTOP_ADMIN_USERNAME"
+ADMIN_PASSWORD = "OCTOP_DEFAULT_PASSWORD"
