@@ -18,9 +18,8 @@ Nginx, Supervisor, PostgreSQL, Redis, or another application container.
 ## Deployment target
 
 - GitHub wrapper: <https://github.com/BlueSkyXN/Octop-all-in-one-HFS>
-- Live Hugging Face Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS-v2>
-- Live app: <https://blueskyxn-octop-all-in-one-hfs-v2.hf.space>
-- Previous Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS> (paused)
+- Live Hugging Face Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS>
+- Live app: <https://blueskyxn-octop-all-in-one-hfs.hf.space>
 - Space mode: Docker, protected preview, `cpu-basic`
 - Public port: `7860`
 - Persistent data: private bucket mounted at `/data`
@@ -62,11 +61,11 @@ well-known fallback password. On first start, the upstream idempotent container
 entrypoint initializes `/data/.octop` and then starts `octop run` on port 7860.
 Subsequent starts reuse the existing database.
 
-Hugging Face Spaces block `Xvnc` at runtime (abuse-handler cmdline match).
-The previous Space `BlueSkyXN/Octop-all-in-one-HFS` was paused after that
-rule matched during a virtual-desktop bake-in. This preview therefore does
-not start the upstream Linux virtual desktop. Use the dashboard and API on
-port 7860; Remote Desktop is not available here.
+Remote Desktop is disabled for this Hugging Face deployment. A revision-bound
+source patch removes its backend router, dashboard route, and navigation item;
+the image installs only the browser extra and fails the build or startup if an
+`Xvnc`/`Xtigervnc` binary is present. Remote Browser through Playwright remains
+available because it does not require the blocked VNC server process.
 
 The login values are maintained in the ignored local `.env` ledger and
 synchronized as the Space variable `OCTOP_ADMIN_USERNAME` and secret
@@ -86,6 +85,8 @@ visibility:     protected Space / private bucket
 
 `hfs-dev.toml` records the deployment contract and the standard-to-upstream
 environment mapping. `config.toml` records the non-secret preview defaults.
+`patches/disable-remote-desktop.patch` is checked against the immutable
+upstream commit before it is applied, so upstream drift fails the build.
 
 ## Local build
 

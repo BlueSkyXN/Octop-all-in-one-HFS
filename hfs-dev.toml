@@ -1,6 +1,6 @@
 standard = "3.0"
 project = "octop-all-in-one-hfs"
-space = "BlueSkyXN/Octop-all-in-one-HFS-v2"
+space = "BlueSkyXN/Octop-all-in-one-HFS"
 
 project_class = "preview"
 target_role = "primary"

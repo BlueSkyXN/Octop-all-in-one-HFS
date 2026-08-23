@@ -18,6 +18,8 @@ RUN apt-get update \
 
 WORKDIR /src
 
+COPY patches/disable-remote-desktop.patch /tmp/disable-remote-desktop.patch
+
 RUN set -eux; \
     printf '%s' "${OCTOP_SOURCE_REF}" | grep -Eq '^[0-9a-f]{40}$'; \
     git init .; \
@@ -26,8 +28,10 @@ RUN set -eux; \
     git checkout --detach FETCH_HEAD; \
     test "$(git rev-parse HEAD)" = "${OCTOP_SOURCE_REF}"; \
     test "$(awk -F'\"' '/^version = / { print $2; exit }' pyproject.toml)" = "${OCTOP_SOURCE_VERSION}"; \
+    git apply --check /tmp/disable-remote-desktop.patch; \
+    git apply /tmp/disable-remote-desktop.patch; \
     printf '%s\n' "${OCTOP_SOURCE_REF}" > .octop-upstream-ref; \
-    rm -rf .git
+    rm -rf .git /tmp/disable-remote-desktop.patch
 
 FROM source AS frontend-builder
 
@@ -58,7 +62,8 @@ LABEL org.opencontainers.image.title="Octop All-in-One HFS" \
       org.opencontainers.image.source="https://github.com/BlueSkyXN/Octop-all-in-one-HFS" \
       org.opencontainers.image.revision="${OCTOP_SOURCE_REF}" \
       org.opencontainers.image.version="${OCTOP_SOURCE_VERSION}" \
-      org.opencontainers.image.licenses="GPL-3.0-only AND MIT"
+      org.opencontainers.image.licenses="GPL-3.0-only AND MIT" \
+      com.blueskyxn.hfs.remote-desktop="disabled"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -116,6 +121,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* /tmp/* \
+    && if command -v Xvnc >/dev/null 2>&1 || command -v Xtigervnc >/dev/null 2>&1; then \
+         echo "HFS build invariant failed: VNC server binary is present" >&2; \
+         exit 1; \
+       fi \
     && test "$(python -c 'import importlib.metadata; print(importlib.metadata.version("octop"))')" = "${OCTOP_SOURCE_VERSION}" \
     && chmod +x /usr/local/bin/octop-upstream-entrypoint /usr/local/bin/octop-hfs-entrypoint \
     && if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 user; fi \
