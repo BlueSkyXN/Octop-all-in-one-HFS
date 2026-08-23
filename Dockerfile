@@ -19,6 +19,7 @@ RUN apt-get update \
 WORKDIR /src
 
 COPY patches/disable-remote-desktop.patch /tmp/disable-remote-desktop.patch
+COPY patches/enforce-persistent-workspaces.patch /tmp/enforce-persistent-workspaces.patch
 
 RUN set -eux; \
     printf '%s' "${OCTOP_SOURCE_REF}" | grep -Eq '^[0-9a-f]{40}$'; \
@@ -30,8 +31,12 @@ RUN set -eux; \
     test "$(awk -F'\"' '/^version = / { print $2; exit }' pyproject.toml)" = "${OCTOP_SOURCE_VERSION}"; \
     git apply --check /tmp/disable-remote-desktop.patch; \
     git apply /tmp/disable-remote-desktop.patch; \
+    git apply --check /tmp/enforce-persistent-workspaces.patch; \
+    git apply /tmp/enforce-persistent-workspaces.patch; \
     printf '%s\n' "${OCTOP_SOURCE_REF}" > .octop-upstream-ref; \
-    rm -rf .git /tmp/disable-remote-desktop.patch
+    rm -rf .git \
+        /tmp/disable-remote-desktop.patch \
+        /tmp/enforce-persistent-workspaces.patch
 
 FROM source AS frontend-builder
 
@@ -72,6 +77,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OCTOP_BIND_HOST=0.0.0.0 \
     OCTOP_PORT=7860 \
     OCTOP_LOG_LEVEL=info \
+    OCTOP_HFS_MOUNT=/data \
+    OCTOP_PERSISTENT_ROOT=/data \
+    OCTOP_BACKUP_AUTO_ENABLED=true \
+    OCTOP_BACKUP_SCHEDULE="cron:0 4 * * *" \
+    OCTOP_BACKUP_RETENTION_COUNT=7 \
     OCTOP_HFS_UPSTREAM_REPO=${OCTOP_SOURCE_REPO} \
     OCTOP_HFS_UPSTREAM_REF=${OCTOP_SOURCE_REF} \
     OCTOP_HFS_UPSTREAM_VERSION=${OCTOP_SOURCE_VERSION} \
@@ -97,7 +107,8 @@ WORKDIR /app
 COPY --from=source /src/pyproject.toml /src/uv.lock /src/README.md /src/LICENSE ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -n "${PIP_INDEX_URL}" ]; then \
+    export UV_CACHE_DIR=/root/.cache/uv \
+    && if [ -n "${PIP_INDEX_URL}" ]; then \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
@@ -112,7 +123,8 @@ COPY --from=source /src/.octop-upstream-ref /app/.octop-upstream-ref
 COPY entrypoint.sh /usr/local/bin/octop-hfs-entrypoint
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -n "${PIP_INDEX_URL}" ]; then \
+    export UV_CACHE_DIR=/root/.cache/uv \
+    && if [ -n "${PIP_INDEX_URL}" ]; then \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
@@ -130,6 +142,30 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 user; fi \
     && mkdir -p /data/.octop /home/user /opt/ms-playwright \
     && chown -R 1000:1000 /data /home/user /opt/ms-playwright
+
+RUN python - <<'PY'
+import os
+from pathlib import Path
+
+from octop.infra.agents.workspace_dir import resolve_workspace_host_path
+
+inside = Path("/data/.octop/agents/hfs-build-probe")
+assert resolve_workspace_host_path(str(inside)) == inside
+try:
+    resolve_workspace_host_path("/tmp/hfs-build-probe")
+except ValueError as exc:
+    assert "must be under persistent root" in str(exc)
+else:
+    raise AssertionError("workspace outside /data was accepted")
+
+os.environ.pop("OCTOP_PERSISTENT_ROOT")
+assert resolve_workspace_host_path("/tmp/hfs-build-probe") == Path("/tmp/hfs-build-probe")
+PY
+
+ENV XDG_CACHE_HOME=/tmp/octop-cache/xdg \
+    UV_CACHE_DIR=/tmp/octop-cache/uv \
+    PIP_CACHE_DIR=/tmp/octop-cache/pip \
+    NPM_CONFIG_CACHE=/tmp/octop-cache/npm
 
 USER 1000
 

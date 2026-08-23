@@ -1,0 +1,141 @@
+diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/workspace_dir.py
+--- a/src/octop/infra/agents/workspace_dir.py
++++ b/src/octop/infra/agents/workspace_dir.py
+@@ -89,15 +89,18 @@ def default_agent_workspace_dir(
+ ) -> Path:
+     """Create-time on-disk workspace (mkdir -p). Not what harness receives."""
+     root_raw = local_backend_root_dir(cfg)
+     if root_raw is not None and not _is_host_root_sentinel(root_raw):
+         try:
+             root = Path(root_raw).expanduser().resolve()
+         except OSError:
+-            return paths.ensure_agent_workspace(agent_id)
+-        out = root / DEFAULT_SYSTEM_FILES_PATH / SCOPED_WORKSPACE_DIRNAME / agent_id
+-        out.mkdir(parents=True, exist_ok=True)
+-        return out
+-    return paths.ensure_agent_workspace(agent_id)
++            out = paths.agent_workspace(agent_id)
++        else:
++            out = root / DEFAULT_SYSTEM_FILES_PATH / SCOPED_WORKSPACE_DIRNAME / agent_id
++    else:
++        out = paths.agent_workspace(agent_id)
++    out = _assert_persistent_workspace(out)
++    out.mkdir(parents=True, exist_ok=True)
++    return out
+ 
+ 
+ def seed_workspace_dir_on_create(
+@@ -144,6 +147,22 @@ def _path_under(child: Path, root: Path) -> bool:
+         return False
+ 
+ 
++def _assert_persistent_workspace(path: Path) -> Path:
++    """Keep host workspace state under the deployment's persistent volume."""
++    raw = os.environ.get("OCTOP_PERSISTENT_ROOT", "").strip()
++    if not raw:
++        return path
++    root = Path(raw).expanduser().resolve()
++    resolved = Path(path).expanduser().resolve()
++    try:
++        resolved.relative_to(root)
++    except ValueError as exc:
++        raise ValueError(
++            f"agent workspace {resolved} must be under persistent root {root}"
++        ) from exc
++    return resolved
++
++
+ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+     """Map persisted ``workspace_dir`` to an on-disk path for Octop host FS ops.
+ 
+@@ -155,11 +174,11 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+     if not text:
+         raise ValueError("workspace_dir is empty")
+     if _is_windows_style_host_path(text):
+-        return Path(text).expanduser().resolve()
++        return _assert_persistent_workspace(Path(text).expanduser().resolve())
+ 
+     root_raw = local_backend_root_dir(cfg)
+     if root_raw is None or _is_host_root_sentinel(root_raw):
+-        return Path(text).expanduser().resolve()
++        return _assert_persistent_workspace(Path(text).expanduser().resolve())
+ 
+     root = Path(root_raw).expanduser().resolve()
+     normalized = text.replace("\\", "/").strip()
+@@ -167,7 +186,8 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+ 
+     if normalized == "/" or normalized.startswith("/.octop/"):
+         rel = normalized.lstrip("/")
+-        return (root / rel).resolve() if rel else root
++        resolved = (root / rel).resolve() if rel else root
++        return _assert_persistent_workspace(resolved)
+ 
+     try:
+         host_resolved = candidate.resolve()
+@@ -175,14 +195,12 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+         host_resolved = candidate
+ 
+     if _path_under(host_resolved, root):
+-        return host_resolved
++        return _assert_persistent_workspace(host_resolved)
+ 
+     if candidate.is_absolute():
+-        return (
+-            host_resolved if host_resolved.exists() or not _running_on_windows() else host_resolved
+-        )
++        return _assert_persistent_workspace(host_resolved)
+ 
+-    return (root / text).resolve()
++    return _assert_persistent_workspace((root / text).resolve())
+ 
+ 
+ def _backend_virtual_mode(cfg: dict[str, Any] | None) -> bool:
+diff --git a/tests/unit/agents/test_workspace_dir.py b/tests/unit/agents/test_workspace_dir.py
+--- a/tests/unit/agents/test_workspace_dir.py
++++ b/tests/unit/agents/test_workspace_dir.py
+@@ -4,6 +4,8 @@ from __future__ import annotations
+ 
+ from pathlib import Path
+ 
++import pytest
++
+ from octop.infra.agents.workspace_dir import (
+     agent_facing_workspace_dir_from_config,
+     agent_facing_workspace_root,
+@@ -91,3 +93,36 @@ def test_workspace_dir_from_config_roundtrip(tmp_path: Path) -> None:
+     host = default_agent_workspace_dir(paths, "RT001", cfg=cfg)
+     cfg["workspace_dir"] = scoped_workspace_dir_str("RT001")
+     assert workspace_dir_from_config(cfg, paths=paths, agent_id="RT001") == host.resolve()
++
++
++def test_persistent_root_accepts_default_workspace(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    persistent_root = tmp_path / "data"
++    paths = PathLayout(persistent_root / ".octop")
++    monkeypatch.setenv("OCTOP_PERSISTENT_ROOT", str(persistent_root))
++
++    cfg: dict = {}
++    host = seed_workspace_dir_on_create(cfg, paths=paths, agent_id="PERSIST1")
++
++    assert host == (persistent_root / ".octop" / "agents" / "PERSIST1").resolve()
++    assert host.is_dir()
++
++
++def test_persistent_root_rejects_workspace_outside_volume(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    persistent_root = tmp_path / "data"
++    paths = PathLayout(persistent_root / ".octop")
++    outside_root = tmp_path / "ephemeral"
++    monkeypatch.setenv("OCTOP_PERSISTENT_ROOT", str(persistent_root))
++
++    custom_cfg = {"workspace_dir": str(outside_root / "custom")}
++    with pytest.raises(ValueError, match="must be under persistent root"):
++        seed_workspace_dir_on_create(custom_cfg, paths=paths, agent_id="OUTSIDE1")
++    assert not outside_root.exists()
++
++    scoped_cfg = _scoped_cfg(outside_root)
++    with pytest.raises(ValueError, match="must be under persistent root"):
++        seed_workspace_dir_on_create(scoped_cfg, paths=paths, agent_id="OUTSIDE2")
++    assert not outside_root.exists()

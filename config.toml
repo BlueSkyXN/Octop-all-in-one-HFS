@@ -1,17 +1,17 @@
-[app]
-environment = "preview"
-log_level = "info"
-
-[server]
-host = "0.0.0.0"
-port = 7860
+# HFS wrapper operations contract consumed by scripts/verify_hfs_storage.py.
+# Upstream Octop runtime configuration lives at /data/.octop/config.json.
 
 [storage]
-data_dir = "/data"
+bucket = "BlueSkyXN/octop-all-in-one-hfs-data"
+mount_path = "/data"
+read_only = false
 
-[auth]
-mode = "password"
-admin_enabled = true
+[paths]
+home = "/data"
+octop_home = "/data/.octop"
+cache_root = "/tmp/octop-cache"
 
-[features]
-registration_enabled = false
+[backup]
+auto_enabled = true
+schedule = "cron:0 4 * * *"
+retention_count = 7
