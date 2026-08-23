@@ -18,8 +18,9 @@ Nginx, Supervisor, PostgreSQL, Redis, or another application container.
 ## Deployment target
 
 - GitHub wrapper: <https://github.com/BlueSkyXN/Octop-all-in-one-HFS>
-- Hugging Face Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS>
-- Live app: <https://blueskyxn-octop-all-in-one-hfs.hf.space>
+- Live Hugging Face Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS-v2>
+- Live app: <https://blueskyxn-octop-all-in-one-hfs-v2.hf.space>
+- Previous Space: <https://huggingface.co/spaces/BlueSkyXN/Octop-all-in-one-HFS> (paused)
 - Space mode: Docker, protected preview, `cpu-basic`
 - Public port: `7860`
 - Persistent data: private bucket mounted at `/data`
@@ -61,9 +62,11 @@ well-known fallback password. On first start, the upstream idempotent container
 entrypoint initializes `/data/.octop` and then starts `octop run` on port 7860.
 Subsequent starts reuse the existing database.
 
-Hugging Face Spaces block `Xvnc` at runtime (abuse-handler cmdline match),
-so this preview does not start the upstream Linux virtual desktop. Use the
-dashboard and API on port 7860; Remote Desktop is not available here.
+Hugging Face Spaces block `Xvnc` at runtime (abuse-handler cmdline match).
+The previous Space `BlueSkyXN/Octop-all-in-one-HFS` was paused after that
+rule matched during a virtual-desktop bake-in. This preview therefore does
+not start the upstream Linux virtual desktop. Use the dashboard and API on
+port 7860; Remote Desktop is not available here.
 
 The login values are maintained in the ignored local `.env` ledger and
 synchronized as the Space variable `OCTOP_ADMIN_USERNAME` and secret
