@@ -141,10 +141,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         --python /app/.venv/bin/python; then \
       echo "install.sh exited non-zero; keep baked files if the desktop stack is complete"; \
     fi; \
-    pkill -f 'X(vnc|tigervnc).*:99' || true; \
-    pkill -f 'openbox --config-file /opt/octop-desktop/openbox.xml' || true; \
-    pkill -x xfce4-panel || true; \
-    pkill -f xfdesktop || true; \
+    if [ -d /data/.octop/desktop/pids ]; then \
+      for f in /data/.octop/desktop/pids/*.pid; do \
+        [ -f "$f" ] || continue; \
+        kill "$(cat "$f")" 2>/dev/null || true; \
+      done; \
+    fi; \
+    for name in Xvnc Xtigervnc xfce4-panel xfdesktop openbox xfsettingsd fcitx5; do \
+      pkill -x "$name" || true; \
+    done; \
     rm -f /tmp/.X99-lock; \
     rm -rf /tmp/.X11-unix/X99 /data/.octop/desktop/pids; \
     test -x /opt/octop-desktop/start-openbox.sh; \
