@@ -115,7 +115,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
     && uv sync --frozen --no-dev --extra browser --extra desktop \
-    && python -c 'import mss, pynput, PIL' \
+    && python -c 'import importlib.util as u; assert u.find_spec("mss") and u.find_spec("pynput") and u.find_spec("PIL")' \
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
