@@ -73,10 +73,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
-    DISPLAY=:99 \
-    OCTOP_DESKTOP_DISPLAY=:99 \
-    OCTOP_DESKTOP_GEOMETRY=1920x1080
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -99,7 +96,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
-    && uv sync --frozen --no-install-project --no-dev --extra browser --extra desktop
+    && uv sync --frozen --no-install-project --no-dev --extra browser
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
@@ -114,8 +111,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         export UV_INDEX_URL="${PIP_INDEX_URL}"; \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
-    && uv sync --frozen --no-dev --extra browser --extra desktop \
-    && python -c 'import importlib.util as u; assert u.find_spec("mss") and u.find_spec("pynput") and u.find_spec("PIL")' \
+    && uv sync --frozen --no-dev --extra browser \
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
@@ -125,41 +121,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 user; fi \
     && mkdir -p /data/.octop /home/user /opt/ms-playwright \
     && chown -R 1000:1000 /data /home/user /opt/ms-playwright
-
-# Hugging Face runs uid 1000 without sudo. Bake the upstream virtual desktop
-# into the image and chown it so the entrypoint can start Xvnc without root.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    set -eux; \
-    mkdir -p /tmp/.X11-unix /tmp/runtime-octop-desktop /data/.octop/desktop; \
-    chmod 1777 /tmp/.X11-unix; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends procps; \
-    if ! OCTOP_HOME=/data/.octop HOME=/data \
-      /bin/bash /app/src/octop/infra/desktop/scripts/linux/v1.0/install.sh \
-        --geometry "${OCTOP_DESKTOP_GEOMETRY:-1920x1080}" \
-        --python /app/.venv/bin/python; then \
-      echo "install.sh exited non-zero; keep baked files if the desktop stack is complete"; \
-    fi; \
-    if [ -d /data/.octop/desktop/pids ]; then \
-      for f in /data/.octop/desktop/pids/*.pid; do \
-        [ -f "$f" ] || continue; \
-        kill "$(cat "$f")" 2>/dev/null || true; \
-      done; \
-    fi; \
-    for name in Xvnc Xtigervnc xfce4-panel xfdesktop openbox xfsettingsd fcitx5; do \
-      pkill -x "$name" || true; \
-    done; \
-    rm -f /tmp/.X99-lock; \
-    rm -rf /tmp/.X11-unix/X99 /data/.octop/desktop/pids; \
-    test -x /opt/octop-desktop/start-openbox.sh; \
-    test -x /opt/octop-desktop/start-session.sh; \
-    test -d /etc/octop-desktop; \
-    test -f /etc/octop-desktop/rfbauth; \
-    command -v Xvnc >/dev/null || command -v Xtigervnc >/dev/null; \
-    chown -R 1000:1000 /opt/octop-desktop /etc/octop-desktop /root /data /tmp/runtime-octop-desktop; \
-    chmod 755 /root; \
-    rm -rf /var/lib/apt/lists/* /tmp/*
 
 USER 1000
 

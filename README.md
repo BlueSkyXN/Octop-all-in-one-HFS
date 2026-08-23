@@ -61,12 +61,9 @@ well-known fallback password. On first start, the upstream idempotent container
 entrypoint initializes `/data/.octop` and then starts `octop run` on port 7860.
 Subsequent starts reuse the existing database.
 
-The image also preinstalls the upstream Linux virtual desktop (TigerVNC on
-`:99`, Openbox/XFCE) and starts it with the container. Hugging Face runs uid
-`1000` without sudo, so the in-app "Install virtual desktop" button cannot
-install packages or write `/opt` and `/etc`. After a rebuild, open Remote
-Desktop directly; do not retry that installer. UI geometry change and
-uninstall still need root/sudo and are not supported in this preview.
+Hugging Face Spaces block `Xvnc` at runtime (abuse-handler cmdline match),
+so this preview does not start the upstream Linux virtual desktop. Use the
+dashboard and API on port 7860; Remote Desktop is not available here.
 
 The login values are maintained in the ignored local `.env` ledger and
 synchronized as the Space variable `OCTOP_ADMIN_USERNAME` and secret
