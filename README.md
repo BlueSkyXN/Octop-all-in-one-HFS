@@ -22,7 +22,8 @@ Nginx, Supervisor, PostgreSQL, Redis, or another application container.
 - Live app: <https://blueskyxn-octop-all-in-one-hfs.hf.space>
 - Space mode: Docker, protected preview, `cpu-basic`
 - Public port: `7860`
-- Persistent data: private bucket mounted at `/data`
+- Persistent data: private bucket `BlueSkyXN/octop-all-in-one-hfs-data`
+  mounted read-write at `/data`
 
 ## Source pin
 
@@ -49,17 +50,35 @@ Octop / FastAPI :7860
   |- API at /api
   `- health at /api/health
 
-/data/.octop
-  |- SQLite database
-  |- users and credentials
-  |- agents, workspaces, chats, and settings
-  `- runtime configuration
+/data                                      persistent bucket-backed HOME
+  |- .octop/
+  |    |- SQLite database and runtime configuration
+  |    |- users, credentials, and OAuth state
+  |    |- agents, workspaces, chats, and settings
+  |    |- browser profiles, knowledge, skills, and plugins
+  |    `- daily application backups
+  |- .config/ and .local/share/            persistent tool state
+  `- other explicit user/tool state
+
+/tmp/octop-cache                           ephemeral caches
+/opt/ms-playwright                         image-baked browser binaries
 ```
 
 The wrapper requires `OCTOP_DEFAULT_PASSWORD`; it does not allow the upstream
 well-known fallback password. On first start, the upstream idempotent container
 entrypoint initializes `/data/.octop` and then starts `octop run` on port 7860.
 Subsequent starts reuse the existing database.
+
+Startup is fail-closed. The wrapper verifies that `/data` is a real mount point
+and that `/data/.octop` is writable before it invokes Octop. Starting without a
+volume, or with a read-only volume, exits instead of silently creating an
+ephemeral database. Runtime `uv`, pip, npm, and XDG caches are redirected to
+`/tmp/octop-cache`; they are not persistent application data.
+
+`OCTOP_PERSISTENT_ROOT=/data` activates a revision-bound upstream patch that
+rejects Agent host workspaces outside the mounted volume. The patch is inert
+when that environment variable is unset, preserving upstream behavior outside
+this HFS image.
 
 Remote Desktop is disabled for this Hugging Face deployment. A revision-bound
 source patch removes its backend router, dashboard route, and navigation item;
@@ -83,10 +102,14 @@ version_source: commit
 visibility:     protected Space / private bucket
 ```
 
-`hfs-dev.toml` records the deployment contract and the standard-to-upstream
-environment mapping. `config.toml` records the non-secret preview defaults.
-`patches/disable-remote-desktop.patch` is checked against the immutable
-upstream commit before it is applied, so upstream drift fails the build.
+`hfs-dev.toml` records the deployment target and standard-to-upstream
+environment mapping. `config.toml` is the non-secret HFS operations contract
+consumed by `scripts/verify_hfs_storage.py`; it records the expected bucket,
+mount, paths, and backup policy but is not an upstream Octop configuration
+file. Octop's live configuration remains the bucket-backed
+`/data/.octop/config.json`. Both revision-bound patches are checked against the
+immutable upstream commit before they are applied, so upstream drift fails the
+build.
 
 ## Local build
 
@@ -108,12 +131,41 @@ Check the service after startup:
 curl -fsS http://127.0.0.1:7860/api/health
 ```
 
+Running the container without `-v ...:/data` is expected to fail the storage
+preflight.
+
+## Storage verification
+
+Use the read-only audit script to compare the live Space, volume, and bucket:
+
+```bash
+python3 scripts/verify_hfs_storage.py
+```
+
+The script verifies the exact private bucket-to-`/data:rw` mapping and reports
+top-level bucket usage without reading credentials, database rows, or object
+contents. Persistent `.cache` data is reported as a warning because old cache
+objects remain until they are reviewed and explicitly removed.
+
 ## Persistence boundary
 
 The Space expects a private Hugging Face Storage Bucket mounted read-write at
-`/data`. Without that mount, all Octop state is ephemeral and can be lost on a
-rebuild, restart, or stop. Changing or deleting the bucket is outside normal
-preview deployment and requires a separate data/rollback decision.
+`/data`. One bucket belongs to one writable Space instance; do not attach this
+SQLite-backed data bucket read-write to another Space or replica. Agent host
+workspaces must resolve under `/data`, while temporary files and caches belong
+under `/tmp`.
+
+Octop automatic backups are enabled daily at `04:00` with seven archives kept
+under `/data/.octop/backups`. These provide application-level SQLite/workspace
+recovery but do not protect against deleting the non-versioned primary bucket.
+A separate private cold-backup bucket remains an operations decision and must
+copy completed backup archives rather than the live `octop.db` file.
+
+Changing, sharing, cleaning, or deleting the primary bucket is outside normal
+preview deployment and requires a separate data/rollback decision. In
+particular, browser profiles contain login state and must not be treated as
+disposable cache. Redirect cache writes first, verify the new runtime, and only
+then review old `.cache` objects with a dry run before any deletion.
 
 ## Licensing
 
