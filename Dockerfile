@@ -141,28 +141,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv pip install --no-deps \
         "octop-memory @ git+https://github.com/BlueSkyXN/octop-memory.git@${OCTOP_MEMORY_REF}" \
         "octop-browser @ git+https://github.com/BlueSkyXN/octop-browser.git@${OCTOP_BROWSER_REF}" \
-    && set -eux; \
-       export OCTOP_HARNESS_REF OCTOP_GATEWAY_REF OCTOP_MEMORY_REF OCTOP_BROWSER_REF; \
-       python - <<'PYEOF'
-import importlib.metadata as im
-import json
-import os
-
-expected = {
-    "octop-harness": os.environ["OCTOP_HARNESS_REF"],
-    "octop-gateway": os.environ["OCTOP_GATEWAY_REF"],
-    "octop-memory": os.environ["OCTOP_MEMORY_REF"],
-    "octop-browser": os.environ["OCTOP_BROWSER_REF"],
-}
-for name, sha in expected.items():
-    url = im.distribution(name).read_text("direct_url.json")
-    assert url, name
-    info = json.loads(url)
-    assert info.get("url", "").startswith("https://github.com/BlueSkyXN/"), (name, info.get("url"))
-    commit = info.get("vcs_info", {}).get("commit_id")
-    assert commit == sha, (name, commit, sha)
-print("component fork pins verified:", expected)
-PYEOF
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
@@ -195,6 +173,29 @@ else:
 os.environ.pop("OCTOP_PERSISTENT_ROOT")
 assert resolve_workspace_host_path("/tmp/hfs-build-probe") == Path("/tmp/hfs-build-probe")
 PY
+
+RUN set -eux; \
+    export OCTOP_HARNESS_REF OCTOP_GATEWAY_REF OCTOP_MEMORY_REF OCTOP_BROWSER_REF; \
+    python - <<'PYEOF'
+import importlib.metadata as im
+import json
+import os
+
+expected = {
+    "octop-harness": os.environ["OCTOP_HARNESS_REF"],
+    "octop-gateway": os.environ["OCTOP_GATEWAY_REF"],
+    "octop-memory": os.environ["OCTOP_MEMORY_REF"],
+    "octop-browser": os.environ["OCTOP_BROWSER_REF"],
+}
+for name, sha in expected.items():
+    url = im.distribution(name).read_text("direct_url.json")
+    assert url, name
+    info = json.loads(url)
+    assert info.get("url", "").startswith("https://github.com/BlueSkyXN/"), (name, info.get("url"))
+    commit = info.get("vcs_info", {}).get("commit_id")
+    assert commit == sha, (name, commit, sha)
+print("component fork pins verified:", expected)
+PYEOF
 
 ENV XDG_CACHE_HOME=/tmp/octop-cache/xdg \
     UV_CACHE_DIR=/tmp/octop-cache/uv \
