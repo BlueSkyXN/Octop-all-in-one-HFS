@@ -92,9 +92,10 @@ when that environment variable is unset, preserving upstream behavior outside
 this HFS image.
 
 Remote Desktop is disabled for this Hugging Face deployment. A revision-bound
-source patch removes its backend router, dashboard route, and navigation item;
-the image installs only the browser extra and fails the build or startup if an
-`Xvnc`/`Xtigervnc` binary is present. Remote Browser through Playwright remains
+source patch removes its backend router, sidebar navigation entry, and route
+prefetch entries. The existing frontend route definitions remain for compatibility;
+they cannot expose the removed desktop backend. The image fails build or startup
+if an `Xvnc`/`Xtigervnc` binary is present. Remote Browser through Playwright remains
 available because it does not require the blocked VNC server process.
 
 The login values are maintained in the ignored local `.env` ledger and
@@ -177,6 +178,33 @@ preview deployment and requires a separate data/rollback decision. In
 particular, browser profiles contain login state and must not be treated as
 disposable cache. Redirect cache writes first, verify the new runtime, and only
 then review old `.cache` objects with a dry run before any deletion.
+
+## Deployment verification and rollback
+
+`scripts/verify_hfs_runtime.py` runs inside the image at build time and at startup.
+It checks exact installed fork sources/SHAs, the removed desktop API routes, the
+persistent workspace guard, and offline Feishu/MCP/card/turn-budget regressions.
+Startup also opens the existing SQLite database read-only for `quick_check`, schema
+version, and aggregate table counts. It does not read credentials, user content,
+provider settings, or real Feishu bindings; the synthetic checks use mocked transports.
+
+These checks do not replace authenticated application acceptance, real model or
+Feishu tests, or a before/after comparison of every user's data. A passing health
+endpoint and an administrator row alone are not proof of complete migration.
+
+Rollback points retained on the Space repository:
+
+- `c557b0bd52b1dede6497a7022bbb856f08ed8c23`: first running five-fork 1.0.2b5 image,
+  before the strengthened workspace guard and runtime evidence script.
+- `f174911e9e067e1ad4c84ebf3898e129f707734b`: legacy 0.9.25 deployment. This is a
+  **code** rollback reference, not a proven database downgrade path.
+
+Restore deployment files from the selected immutable revision in a separate clean
+checkout, then create a normal new HF commit containing only those deployment files.
+Do not force-push history, upload a local `.env`, change Space Secrets, remount the
+bucket, or delete persistent data. A schema downgrade to 0.9.25 requires an explicitly
+approved, compatible pre-upgrade data backup; existing backup filenames alone do not
+prove restore compatibility. No backup restoration was performed by this deployment.
 
 ## Licensing
 

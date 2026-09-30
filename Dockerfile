@@ -130,6 +130,7 @@ COPY --from=frontend-builder /src/src/octop/dashboard/ ./src/octop/dashboard/
 COPY --from=source /src/docker/docker-entrypoint.sh /usr/local/bin/octop-upstream-entrypoint
 COPY --from=source /src/.octop-upstream-ref /app/.octop-upstream-ref
 COPY entrypoint.sh /usr/local/bin/octop-hfs-entrypoint
+COPY scripts/verify_hfs_runtime.py /app/verify_hfs_runtime.py
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     export UV_CACHE_DIR=/root/.cache/uv \
@@ -196,6 +197,8 @@ for name, sha in expected.items():
     assert commit == sha, (name, commit, sha)
 print("component fork pins verified:", expected)
 PYEOF
+
+RUN python /app/verify_hfs_runtime.py
 
 ENV XDG_CACHE_HOME=/tmp/octop-cache/xdg \
     UV_CACHE_DIR=/tmp/octop-cache/uv \
