@@ -27,13 +27,24 @@ Nginx, Supervisor, PostgreSQL, Redis, or another application container.
 
 ## Source pin
 
-The Docker build fetches and verifies one immutable upstream revision:
+The Docker build fetches and verifies one immutable revision of the user's
+five-repository fork stack (Octop + octop-harness/gateway/memory/browser):
 
 ```text
-repository: https://github.com/TencentCloud/Octop.git
-commit:     bfe017adc183cbce7fbd6ca57b050d925a015ee0
-version:    0.9.25
+repository: https://github.com/BlueSkyXN/Octop.git
+commit:     d49e8dc57871ffe5d6e1ec754e41513c434ce5e2
+version:    1.0.2b5   (feature/feishu-component-migration)
+
+component forks (verified at build time via direct_url commit ids):
+  octop-harness  418ce889db91b027e93f5f7b68d8b8efcef23208  (feature/feishu-runtime-hardening)
+  octop-gateway  1ddcd5a6611bc3205d2b4fdc28c4387d6892f487  (feature/feishu-native-hardening)
+  octop-memory   8b6abc3b6817f6b6d993d68190bc7ffc0a70dccf  (fork main, tracks upstream)
+  octop-browser  bb26e92b1d3243be6c09530e7526f80bb1b69bda  (fork main, tracks upstream)
 ```
+
+octop-harness / octop-gateway are pinned by the Octop repo's own lockfile;
+octop-memory / octop-browser are force-installed from the same user forks after
+`uv sync` so the image can never silently fall back to official PyPI packages.
 
 The full upstream source is not copied into this wrapper repository. The build
 verifies both the 40-character Git commit and the version in `pyproject.toml`
