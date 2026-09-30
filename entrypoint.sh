@@ -51,4 +51,6 @@ fi
 
 echo "[storage] verified read-write HFS volume at ${OCTOP_HFS_MOUNT}; OCTOP_HOME=${OCTOP_HOME}"
 
+python /app/verify_hfs_runtime.py --database-summary
+
 exec /usr/local/bin/octop-upstream-entrypoint "$@"
