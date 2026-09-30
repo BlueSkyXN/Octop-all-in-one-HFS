@@ -2,9 +2,13 @@
 
 ARG NODE_IMAGE=node:20-slim
 ARG PYTHON_IMAGE=python:3.12-slim
-ARG OCTOP_SOURCE_REPO=https://github.com/TencentCloud/Octop.git
-ARG OCTOP_SOURCE_REF=bfe017adc183cbce7fbd6ca57b050d925a015ee0
-ARG OCTOP_SOURCE_VERSION=0.9.25
+ARG OCTOP_SOURCE_REPO=https://github.com/BlueSkyXN/Octop.git
+ARG OCTOP_SOURCE_REF=d49e8dc57871ffe5d6e1ec754e41513c434ce5e2
+ARG OCTOP_SOURCE_VERSION=1.0.2b5
+ARG OCTOP_HARNESS_REF=418ce889db91b027e93f5f7b68d8b8efcef23208
+ARG OCTOP_GATEWAY_REF=1ddcd5a6611bc3205d2b4fdc28c4387d6892f487
+ARG OCTOP_MEMORY_REF=8b6abc3b6817f6b6d993d68190bc7ffc0a70dccf
+ARG OCTOP_BROWSER_REF=bb26e92b1d3243be6c09530e7526f80bb1b69bda
 
 FROM ${NODE_IMAGE} AS source
 
@@ -59,6 +63,10 @@ FROM ${PYTHON_IMAGE} AS runtime
 ARG OCTOP_SOURCE_REPO
 ARG OCTOP_SOURCE_REF
 ARG OCTOP_SOURCE_VERSION
+ARG OCTOP_HARNESS_REF
+ARG OCTOP_GATEWAY_REF
+ARG OCTOP_MEMORY_REF
+ARG OCTOP_BROWSER_REF
 ARG PIP_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 
@@ -85,6 +93,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OCTOP_HFS_UPSTREAM_REPO=${OCTOP_SOURCE_REPO} \
     OCTOP_HFS_UPSTREAM_REF=${OCTOP_SOURCE_REF} \
     OCTOP_HFS_UPSTREAM_VERSION=${OCTOP_SOURCE_VERSION} \
+    OCTOP_HFS_COMPONENT_REFS="harness=${OCTOP_HARNESS_REF};gateway=${OCTOP_GATEWAY_REF};memory=${OCTOP_MEMORY_REF};browser=${OCTOP_BROWSER_REF}" \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
@@ -129,6 +138,31 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
     && uv sync --frozen --no-dev --extra browser \
+    && uv pip install --no-deps \
+        "octop-memory @ git+https://github.com/BlueSkyXN/octop-memory.git@${OCTOP_MEMORY_REF}" \
+        "octop-browser @ git+https://github.com/BlueSkyXN/octop-browser.git@${OCTOP_BROWSER_REF}" \
+    && set -eux; \
+       export OCTOP_HARNESS_REF OCTOP_GATEWAY_REF OCTOP_MEMORY_REF OCTOP_BROWSER_REF; \
+       python - <<'PYEOF'
+import importlib.metadata as im
+import json
+import os
+
+expected = {
+    "octop-harness": os.environ["OCTOP_HARNESS_REF"],
+    "octop-gateway": os.environ["OCTOP_GATEWAY_REF"],
+    "octop-memory": os.environ["OCTOP_MEMORY_REF"],
+    "octop-browser": os.environ["OCTOP_BROWSER_REF"],
+}
+for name, sha in expected.items():
+    url = im.distribution(name).read_text("direct_url.json")
+    assert url, name
+    info = json.loads(url)
+    assert info.get("url", "").startswith("https://github.com/BlueSkyXN/"), (name, info.get("url"))
+    commit = info.get("vcs_info", {}).get("commit_id")
+    assert commit == sha, (name, commit, sha)
+print("component fork pins verified:", expected)
+PYEOF
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
@@ -147,7 +181,7 @@ RUN python - <<'PY'
 import os
 from pathlib import Path
 
-from octop.infra.agents.workspace_dir import resolve_workspace_host_path
+from octop.infra.agents.workspace.dir import resolve_workspace_host_path
 
 inside = Path("/data/.octop/agents/hfs-build-probe")
 assert resolve_workspace_host_path(str(inside)) == inside
