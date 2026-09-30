@@ -1,20 +1,23 @@
-diff --git a/dashboard/src/layouts/Sidebar.tsx b/dashboard/src/layouts/Sidebar.tsx
-index d573cf3..d5d87b3 100644
---- a/dashboard/src/layouts/Sidebar.tsx
-+++ b/dashboard/src/layouts/Sidebar.tsx
-@@ -7,7 +7,6 @@ import AvatarDropdown from "../components/AvatarDropdown";
- import AppVersionBadge from "../components/AppVersionBadge";
- import CurrentVersionBadge from "../components/CurrentVersionBadge";
+diff --git a/dashboard/src/layouts/sidebarNav.tsx b/dashboard/src/layouts/sidebarNav.tsx
+index 66450316..4a40edb5 100644
+--- a/dashboard/src/layouts/sidebarNav.tsx
++++ b/dashboard/src/layouts/sidebarNav.tsx
+@@ -1,6 +1,5 @@
+ import type { ReactNode } from "react";
  import {
 -  Monitor,
    MessageSquareText,
    Timer,
-   ArrowRightLeft,
-@@ -212,14 +211,6 @@ function buildNavSections(user: OctopUser | null): NavSection[] {
+   SlidersHorizontal,
+@@ -231,18 +230,6 @@ export function buildNavSections(
        labelKey: "nav.workbench",
      });
    }
--  if (navAllowed(user, "remote-desktop")) {
+-  // Server desktop + phone share one nav entry; phone tab also needs host capability.
+-  if (
+-    userCan(user, "desktop") ||
+-    (opts?.mobileEnabled && userCan(user, "mobile"))
+-  ) {
 -    controlItems.push({
 -      key: "remote-desktop",
 -      path: "/remote-desktop",
@@ -25,49 +28,27 @@ index d573cf3..d5d87b3 100644
    // ACP: no module key this round — admin role only.
    if (navAllowed(user, "acp")) {
      controlItems.push({
-diff --git a/dashboard/src/routes/index.tsx b/dashboard/src/routes/index.tsx
-index 32273a2..422ecf8 100644
---- a/dashboard/src/routes/index.tsx
-+++ b/dashboard/src/routes/index.tsx
-@@ -13,9 +13,6 @@ const PersonalizationPage = lazy(
- );
- const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
- 
--// Lazy-loaded pages — Control
--const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
--
- // Lazy-loaded pages — Settings
- const ModelsPage = lazy(() => import("../pages/Settings/Models"));
- 
-@@ -69,7 +66,6 @@ export const pathToKey: Record<string, string> = {
-   "/workbench/browser": "workbench",
-   "/terminal": "workbench",
-   "/remote-browser": "workbench",
--  "/remote-desktop": "remote-desktop",
-   "/subagents": "personalization",
-   "/mbti": "personalization",
-   "/memory": "personalization",
-@@ -91,7 +87,6 @@ export const FULLSCREEN_PATHS = new Set([
-   "/workbench/terminal",
-   "/workbench/browser",
-   "/chat",
--  "/remote-desktop",
- ]);
- 
- /**
-@@ -157,7 +152,6 @@ export const routeConfigs: RouteConfig[] = [
-     path: "/remote-browser",
-     element: <RedirectPreserveSearch to="/workbench/browser" />,
-   },
--  { path: "/remote-desktop", element: <RemoteDesktopPage /> },
-   {
-     path: "/subagents",
-     element: <RedirectPreserveSearch to="/personalization/subagents" />,
+diff --git a/dashboard/src/routes/prefetch.ts b/dashboard/src/routes/prefetch.ts
+index fa5488df..b1bf5c5e 100644
+--- a/dashboard/src/routes/prefetch.ts
++++ b/dashboard/src/routes/prefetch.ts
+@@ -12,11 +12,6 @@ const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
+   "/workbench": () => import("../pages/Control/Workbench"),
+   "/workbench/browser": () => import("../pages/Control/Workbench"),
+   "/workbench/terminal": () => import("../pages/Control/Workbench"),
+-  "/remote-desktop": () => import("../pages/Control/RemoteDesktop"),
+-  "/remote-desktop/desktop": () => import("../pages/Control/RemoteDesktop"),
+-  "/remote-desktop/phone": () => import("../pages/Control/RemoteDesktop"),
+-  "/remote-phone": () => import("../pages/Control/RemoteDesktop"),
+-  "/remote-android": () => import("../pages/Control/RemoteDesktop"),
+   "/acp": () => import("../pages/Agent/ACP"),
+   "/personalization": () => import("../pages/Agent/Personalization"),
+   "/personalization/skills": () => import("../pages/Agent/Personalization"),
 diff --git a/src/octop/api/app.py b/src/octop/api/app.py
-index af0a006..970cd3f 100644
+index 03513b13..c300ad45 100644
 --- a/src/octop/api/app.py
 +++ b/src/octop/api/app.py
-@@ -134,7 +134,6 @@ def create_app(server: Any) -> FastAPI:
+@@ -165,7 +165,6 @@ def build_app(server: OctopServer) -> FastAPI:
          chat,
          connectors,
          cron,
@@ -75,7 +56,7 @@ index af0a006..970cd3f 100644
          envs,
          experts,
          health,
-@@ -229,7 +228,6 @@ def create_app(server: Any) -> FastAPI:
+@@ -274,7 +273,6 @@ def build_app(server: OctopServer) -> FastAPI:
              _RouterMount(uploads.router, "/api", ["chat"]),
              _RouterMount(update.router, "/api", ["update"]),
              _RouterMount(browser.router, "/api", ["browser"]),

@@ -1,31 +1,34 @@
-diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/workspace_dir.py
---- a/src/octop/infra/agents/workspace_dir.py
-+++ b/src/octop/infra/agents/workspace_dir.py
-@@ -89,15 +89,18 @@ def default_agent_workspace_dir(
- ) -> Path:
-     """Create-time on-disk workspace (mkdir -p). Not what harness receives."""
-     root_raw = local_backend_root_dir(cfg)
-     if root_raw is not None and not _is_host_root_sentinel(root_raw):
+diff --git a/src/octop/infra/agents/workspace/dir.py b/src/octop/infra/agents/workspace/dir.py
+index 5b94ff02..0da5baaf 100644
+--- a/src/octop/infra/agents/workspace/dir.py
++++ b/src/octop/infra/agents/workspace/dir.py
+@@ -109,16 +109,18 @@ def default_agent_workspace_dir(
          try:
              root = Path(root_raw).expanduser().resolve()
          except OSError:
--            return paths.ensure_agent_workspace(agent_id)
+-            if ensure:
+-                return paths.ensure_agent_workspace(agent_id)
+-            return paths.agent_workspace(agent_id)
 -        out = root / DEFAULT_SYSTEM_FILES_PATH / SCOPED_WORKSPACE_DIRNAME / agent_id
--        out.mkdir(parents=True, exist_ok=True)
--        return out
--    return paths.ensure_agent_workspace(agent_id)
-+            out = paths.agent_workspace(agent_id)
-+        else:
-+            out = root / DEFAULT_SYSTEM_FILES_PATH / SCOPED_WORKSPACE_DIRNAME / agent_id
-+    else:
-+        out = paths.agent_workspace(agent_id)
-+    out = _assert_persistent_workspace(out)
-+    out.mkdir(parents=True, exist_ok=True)
++            out = paths.ensure_agent_workspace(agent_id) if ensure else paths.agent_workspace(agent_id)
++            return _assert_persistent_workspace(out)
++        out = _assert_persistent_workspace(
++            root / DEFAULT_SYSTEM_FILES_PATH / SCOPED_WORKSPACE_DIRNAME / agent_id
++        )
+         if ensure:
+             out.mkdir(parents=True, exist_ok=True)
+         return out
+-    if ensure:
+-        return paths.ensure_agent_workspace(agent_id)
+-    return paths.agent_workspace(agent_id)
++    out = _assert_persistent_workspace(
++        paths.ensure_agent_workspace(agent_id) if ensure else paths.agent_workspace(agent_id)
++    )
 +    return out
  
  
  def seed_workspace_dir_on_create(
-@@ -144,6 +147,22 @@ def _path_under(child: Path, root: Path) -> bool:
+@@ -165,6 +167,22 @@ def _path_under(child: Path, root: Path) -> bool:
          return False
  
  
@@ -48,7 +51,7 @@ diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/wo
  def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
      """Map persisted ``workspace_dir`` to an on-disk path for Octop host FS ops.
  
-@@ -155,11 +174,11 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+@@ -176,11 +194,11 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) ->
      if not text:
          raise ValueError("workspace_dir is empty")
      if _is_windows_style_host_path(text):
@@ -62,7 +65,7 @@ diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/wo
  
      root = Path(root_raw).expanduser().resolve()
      normalized = text.replace("\\", "/").strip()
-@@ -167,7 +186,8 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+@@ -188,7 +206,8 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) ->
  
      if normalized == "/" or normalized.startswith("/.octop/"):
          rel = normalized.lstrip("/")
@@ -72,7 +75,7 @@ diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/wo
  
      try:
          host_resolved = candidate.resolve()
-@@ -175,14 +195,12 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
+@@ -196,14 +215,12 @@ def resolve_workspace_host_path(raw: str, cfg: dict[str, Any] | None = None) ->
          host_resolved = candidate
  
      if _path_under(host_resolved, root):
@@ -89,23 +92,15 @@ diff --git a/src/octop/infra/agents/workspace_dir.py b/src/octop/infra/agents/wo
 +    return _assert_persistent_workspace((root / text).resolve())
  
  
- def _backend_virtual_mode(cfg: dict[str, Any] | None) -> bool:
+ def harness_workspace_path(raw: str, cfg: dict[str, Any] | None = None) -> Path:
 diff --git a/tests/unit/agents/test_workspace_dir.py b/tests/unit/agents/test_workspace_dir.py
+index a9d30513..0eee8341 100644
 --- a/tests/unit/agents/test_workspace_dir.py
 +++ b/tests/unit/agents/test_workspace_dir.py
-@@ -4,6 +4,8 @@ from __future__ import annotations
- 
- from pathlib import Path
- 
-+import pytest
-+
- from octop.infra.agents.workspace_dir import (
-     agent_facing_workspace_dir_from_config,
-     agent_facing_workspace_root,
-@@ -91,3 +93,36 @@ def test_workspace_dir_from_config_roundtrip(tmp_path: Path) -> None:
-     host = default_agent_workspace_dir(paths, "RT001", cfg=cfg)
-     cfg["workspace_dir"] = scoped_workspace_dir_str("RT001")
-     assert workspace_dir_from_config(cfg, paths=paths, agent_id="RT001") == host.resolve()
+@@ -142,3 +142,36 @@ def test_default_workspace_ensure_false_does_not_mkdir(tmp_path: Path) -> None:
+     out = default_agent_workspace_dir(paths, "A1", ensure=False)
+     assert out == paths.agent_workspace("A1")
+     assert not out.exists()
 +
 +
 +def test_persistent_root_accepts_default_workspace(
