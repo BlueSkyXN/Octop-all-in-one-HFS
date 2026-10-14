@@ -27,24 +27,22 @@ Nginx, Supervisor, PostgreSQL, Redis, or another application container.
 
 ## Source pin
 
-The Docker build fetches and verifies one immutable revision of the user's
-five-repository fork stack (Octop + octop-harness/gateway/memory/browser):
+The Docker build fetches and verifies one immutable official release:
 
 ```text
-repository: https://github.com/BlueSkyXN/Octop.git
-commit:     d49e8dc57871ffe5d6e1ec754e41513c434ce5e2
-version:    1.0.2b5   (feature/feishu-component-migration)
+repository: https://github.com/TencentCloud/Octop.git
+commit:     664c1fb38e354ea987041aa14b151e20d15ce71f
+version:    1.0.2b7
 
-component forks (verified at build time via direct_url commit ids):
-  octop-harness  418ce889db91b027e93f5f7b68d8b8efcef23208  (feature/feishu-runtime-hardening)
-  octop-gateway  1ddcd5a6611bc3205d2b4fdc28c4387d6892f487  (feature/feishu-native-hardening)
-  octop-memory   8b6abc3b6817f6b6d993d68190bc7ffc0a70dccf  (fork main, tracks upstream)
-  octop-browser  bb26e92b1d3243be6c09530e7526f80bb1b69bda  (fork main, tracks upstream)
+lockfile components verified at build time:
+  octop-harness  1.0.2
+  octop-gateway  1.0.0
+  octop-memory   1.0.1
+  octop-browser  1.0.0
 ```
 
-octop-harness / octop-gateway are pinned by the Octop repo's own lockfile;
-octop-memory / octop-browser are force-installed from the same user forks after
-`uv sync` so the image can never silently fall back to official PyPI packages.
+All four components come from the official release lockfile via `uv sync`.
+The image does not install the previous BlueSkyXN fork commits.
 
 The full upstream source is not copied into this wrapper repository. The build
 verifies both the 40-character Git commit and the version in `pyproject.toml`
@@ -182,8 +180,9 @@ then review old `.cache` objects with a dry run before any deletion.
 ## Deployment verification and rollback
 
 `scripts/verify_hfs_runtime.py` runs inside the image at build time and at startup.
-It checks exact installed fork sources/SHAs, the removed desktop API routes, the
-persistent workspace guard, and offline Feishu/MCP/card/turn-budget regressions.
+It checks the official Octop commit, locked component versions, the removed desktop
+API routes, and the persistent workspace guard. It does not rerun the previous
+fork-only Feishu card, mention, or turn-budget regressions.
 Startup also opens the existing SQLite database read-only for `quick_check`, schema
 version, and aggregate table counts. It does not read credentials, user content,
 provider settings, or real Feishu bindings; the synthetic checks use mocked transports.
@@ -194,6 +193,8 @@ endpoint and an administrator row alone are not proof of complete migration.
 
 Rollback points retained on the Space repository:
 
+- `05b470b4ce19d76239da939a2dcaa43ac5ea7208`: previous five-fork deployment of
+  Octop `d49e8dc5` / version 1.0.2b5. Use this to return to the fork stack.
 - `c557b0bd52b1dede6497a7022bbb856f08ed8c23`: first running five-fork 1.0.2b5 image,
   before the strengthened workspace guard and runtime evidence script.
 - `f174911e9e067e1ad4c84ebf3898e129f707734b`: legacy 0.9.25 deployment. This is a

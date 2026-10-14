@@ -2,13 +2,13 @@
 
 ARG NODE_IMAGE=node:20-slim
 ARG PYTHON_IMAGE=python:3.12-slim
-ARG OCTOP_SOURCE_REPO=https://github.com/BlueSkyXN/Octop.git
-ARG OCTOP_SOURCE_REF=d49e8dc57871ffe5d6e1ec754e41513c434ce5e2
-ARG OCTOP_SOURCE_VERSION=1.0.2b5
-ARG OCTOP_HARNESS_REF=418ce889db91b027e93f5f7b68d8b8efcef23208
-ARG OCTOP_GATEWAY_REF=1ddcd5a6611bc3205d2b4fdc28c4387d6892f487
-ARG OCTOP_MEMORY_REF=8b6abc3b6817f6b6d993d68190bc7ffc0a70dccf
-ARG OCTOP_BROWSER_REF=bb26e92b1d3243be6c09530e7526f80bb1b69bda
+ARG OCTOP_SOURCE_REPO=https://github.com/TencentCloud/Octop.git
+ARG OCTOP_SOURCE_REF=664c1fb38e354ea987041aa14b151e20d15ce71f
+ARG OCTOP_SOURCE_VERSION=1.0.2b7
+ARG OCTOP_HARNESS_VERSION=1.0.2
+ARG OCTOP_GATEWAY_VERSION=1.0.0
+ARG OCTOP_MEMORY_VERSION=1.0.1
+ARG OCTOP_BROWSER_VERSION=1.0.0
 
 FROM ${NODE_IMAGE} AS source
 
@@ -63,10 +63,10 @@ FROM ${PYTHON_IMAGE} AS runtime
 ARG OCTOP_SOURCE_REPO
 ARG OCTOP_SOURCE_REF
 ARG OCTOP_SOURCE_VERSION
-ARG OCTOP_HARNESS_REF
-ARG OCTOP_GATEWAY_REF
-ARG OCTOP_MEMORY_REF
-ARG OCTOP_BROWSER_REF
+ARG OCTOP_HARNESS_VERSION
+ARG OCTOP_GATEWAY_VERSION
+ARG OCTOP_MEMORY_VERSION
+ARG OCTOP_BROWSER_VERSION
 ARG PIP_INDEX_URL=
 ARG PIP_TRUSTED_HOST=
 
@@ -93,7 +93,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OCTOP_HFS_UPSTREAM_REPO=${OCTOP_SOURCE_REPO} \
     OCTOP_HFS_UPSTREAM_REF=${OCTOP_SOURCE_REF} \
     OCTOP_HFS_UPSTREAM_VERSION=${OCTOP_SOURCE_VERSION} \
-    OCTOP_HFS_COMPONENT_REFS="harness=${OCTOP_HARNESS_REF};gateway=${OCTOP_GATEWAY_REF};memory=${OCTOP_MEMORY_REF};browser=${OCTOP_BROWSER_REF}" \
+    OCTOP_HFS_COMPONENT_VERSIONS="harness=${OCTOP_HARNESS_VERSION};gateway=${OCTOP_GATEWAY_VERSION};memory=${OCTOP_MEMORY_VERSION};browser=${OCTOP_BROWSER_VERSION}" \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
@@ -139,9 +139,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         if [ -n "${PIP_TRUSTED_HOST}" ]; then export UV_INSECURE_HOST="${PIP_TRUSTED_HOST}"; fi; \
     fi \
     && uv sync --frozen --no-dev --extra browser \
-    && uv pip install --no-deps \
-        "octop-memory @ git+https://github.com/BlueSkyXN/octop-memory.git@${OCTOP_MEMORY_REF}" \
-        "octop-browser @ git+https://github.com/BlueSkyXN/octop-browser.git@${OCTOP_BROWSER_REF}" \
     && playwright install --with-deps chromium \
     && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
@@ -174,29 +171,6 @@ else:
 os.environ.pop("OCTOP_PERSISTENT_ROOT")
 assert resolve_workspace_host_path("/tmp/hfs-build-probe") == Path("/tmp/hfs-build-probe")
 PY
-
-RUN set -eux; \
-    export OCTOP_HARNESS_REF OCTOP_GATEWAY_REF OCTOP_MEMORY_REF OCTOP_BROWSER_REF; \
-    python - <<'PYEOF'
-import importlib.metadata as im
-import json
-import os
-
-expected = {
-    "octop-harness": os.environ["OCTOP_HARNESS_REF"],
-    "octop-gateway": os.environ["OCTOP_GATEWAY_REF"],
-    "octop-memory": os.environ["OCTOP_MEMORY_REF"],
-    "octop-browser": os.environ["OCTOP_BROWSER_REF"],
-}
-for name, sha in expected.items():
-    url = im.distribution(name).read_text("direct_url.json")
-    assert url, name
-    info = json.loads(url)
-    assert info.get("url", "").startswith("https://github.com/BlueSkyXN/"), (name, info.get("url"))
-    commit = info.get("vcs_info", {}).get("commit_id")
-    assert commit == sha, (name, commit, sha)
-print("component fork pins verified:", expected)
-PYEOF
 
 RUN python /app/verify_hfs_runtime.py
 
