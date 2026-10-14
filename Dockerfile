@@ -179,6 +179,19 @@ ENV XDG_CACHE_HOME=/tmp/octop-cache/xdg \
     PIP_CACHE_DIR=/tmp/octop-cache/pip \
     NPM_CONFIG_CACHE=/tmp/octop-cache/npm
 
+# The Feishu/WeCom CLI connectors need the lark-cli binary. The container runs
+# as UID 1000, so neither apt nor a global npm install is possible at runtime —
+# Node.js, npm, and the pinned CLI are baked into the image instead. The
+# build-time npm cache follows NPM_CONFIG_CACHE into /tmp/octop-cache/npm and is
+# removed by this layer.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends nodejs npm \
+    && npm install -g @larksuite/cli@1.0.98 \
+    && lark-cli --version \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
+
 USER 1000
 
 EXPOSE 7860

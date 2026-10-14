@@ -84,6 +84,13 @@ volume, or with a read-only volume, exits instead of silently creating an
 ephemeral database. Runtime `uv`, pip, npm, and XDG caches are redirected to
 `/tmp/octop-cache`; they are not persistent application data.
 
+Node.js, npm, and the pinned `@larksuite/cli` runtime are baked into the image.
+The Feishu CLI connector depends on the `lark-cli` binary; its in-page install
+button cannot work on this Space because the container runs as UID 1000 without
+write access to npm's global prefix, so the binary is provided by the image
+instead. `lark-cli` credential state persists at `/data/.local/share/lark-cli`
+and survives Space restarts and rebuilds.
+
 `OCTOP_PERSISTENT_ROOT=/data` activates a revision-bound upstream patch that
 rejects Agent host workspaces outside the mounted volume. The patch is inert
 when that environment variable is unset, preserving upstream behavior outside
