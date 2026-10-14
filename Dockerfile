@@ -192,6 +192,29 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && lark-cli --version \
     && rm -rf /var/lib/apt/lists/* /tmp/*
 
+# usque: userspace Cloudflare WARP client. The model-egress path to
+# gateway.ai.cloudflare.com rides the WARP tunnel so the shared HF egress
+# IP cannot be rate-limited/blackholed at the CF edge. Pinned release +
+# SHA256, same artifacts as CPA-HFS-2026-PRO.
+ARG USQUE_VERSION=4.2.1
+RUN set -eu; \
+    apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64) USQUE_ARCH=amd64; USQUE_SHA256=4117e20695078af9c11edecd1a826c009bbc7ea0b7f64458612b4198910bc313 ;; \
+      arm64) USQUE_ARCH=arm64; USQUE_SHA256=c88b061c2a567f30813d7505637d1fb6fe7ec5898b5b61fd05122409fa5ad925 ;; \
+      *) echo "Unsupported architecture for usque: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/usque.zip \
+      "https://github.com/Diniboy1123/usque/releases/download/v${USQUE_VERSION}/usque_${USQUE_VERSION}_linux_${USQUE_ARCH}.zip"; \
+    echo "$USQUE_SHA256  /tmp/usque.zip" | sha256sum -c -; \
+    unzip -q /tmp/usque.zip usque -d /usr/local/bin; \
+    chmod +x /usr/local/bin/usque; \
+    rm -f /tmp/usque.zip; \
+    usque --help >/dev/null 2>&1 || true
+
 USER 1000
 
 EXPOSE 7860

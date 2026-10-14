@@ -103,6 +103,38 @@ they cannot expose the removed desktop backend. The image fails build or startup
 if an `Xvnc`/`Xtigervnc` binary is present. Remote Browser through Playwright remains
 available because it does not require the blocked VNC server process.
 
+## WARP egress for model traffic (usque)
+
+On 2026-10-14 the Space's shared HF egress was TLS-blackholed toward
+`gateway.ai.cloudflare.com` for hours (TCP connected in 5 ms, TLS handshake
+silently dropped; same-container HTTPS to `*.hf.space` worked throughout).
+Octop's model provider points at the Cloudflare AI Gateway, so every Feishu
+turn failed with `Connection error` until the egress path rotated.
+
+The image therefore ships [usque](https://github.com/Diniboy1123/usque)
+(pinned v4.2.1, SHA256-verified, same artifacts as CPA-HFS-2026-PRO). When
+`OCTOP_WARP_ENABLED=true`, the entrypoint registers a WARP identity (persisted
+at `/data/warp/usque-config.json` so rebuilds reuse it), starts a local
+userspace HTTP proxy (`usque http-proxy`, loopback only), verifies the tunnel,
+and exports `HTTPS_PROXY`/`HTTP_PROXY` pointing at it. Octop's httpx stack
+honors these variables natively; `NO_PROXY` keeps Feishu long-lived
+connections, `*.hf.space`, and loopback traffic out of the tunnel, so only
+model-provider egress rides WARP.
+
+Startup fails open: if usque is missing, registration fails, or the tunnel
+does not verify in time, Octop still boots with direct egress (the pre-WARP
+behavior) and logs a `[warp]` line stating so. Set `OCTOP_WARP_ENABLED=false`
+(or unset it) to disable the whole path.
+
+Variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OCTOP_WARP_ENABLED` | `false` | Master switch for WARP egress |
+| `OCTOP_WARP_HTTP_PORT` | `8080` | Loopback HTTP proxy port |
+| `OCTOP_WARP_NO_PROXY` | Feishu/HF/loopback list | `NO_PROXY` value when WARP is on |
+
+
 The login values are maintained in the ignored local `.env` ledger and
 synchronized as the Space variable `OCTOP_ADMIN_USERNAME` and secret
 `OCTOP_DEFAULT_PASSWORD`. They are not stored in Git or this README.
