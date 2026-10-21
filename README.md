@@ -31,13 +31,13 @@ The Docker build fetches and verifies one immutable official release:
 
 ```text
 repository: https://github.com/TencentCloud/Octop.git
-commit:     664c1fb38e354ea987041aa14b151e20d15ce71f
-version:    1.0.2b7
+commit:     dd9dce470844c25d59effb50615bb3c667ea25cd
+version:    1.0.2
 
 lockfile components verified at build time:
-  octop-harness  1.0.2
-  octop-gateway  1.0.0
-  octop-memory   1.0.1
+  octop-harness  1.0.4
+  octop-gateway  1.0.3
+  octop-memory   1.0.2
   octop-browser  1.0.0
 ```
 
@@ -232,6 +232,9 @@ endpoint and an administrator row alone are not proof of complete migration.
 
 Rollback points retained on the Space repository:
 
+- `f79b3305`: official 1.0.2b7 + lark-cli 1.0.98 + WARP egress, the deployment
+  immediately before the 1.0.2 upgrade.
+- `422c55f6`: official 1.0.2b7 + lark-cli 1.0.98, before WARP egress was added.
 - `05b470b4ce19d76239da939a2dcaa43ac5ea7208`: previous five-fork deployment of
   Octop `d49e8dc5` / version 1.0.2b5. Use this to return to the fork stack.
 - `c557b0bd52b1dede6497a7022bbb856f08ed8c23`: first running five-fork 1.0.2b5 image,
